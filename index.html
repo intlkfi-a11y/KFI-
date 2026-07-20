@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="해외지원사업">
+<meta name="theme-color" content="#0F1E3D">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>한국소방산업기술원 해외지원사업</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<style>
+:root{
+  --navy:#0F1E3D; --navy-2:#152a4f; --steel:#2C4A7C; --steel-light:#5978aa;
+  --amber:#E8A33D; --ember:#C4432B; --teal:#1B8A6B; --mist:#F5F7FA; --white:#FFFFFF;
+  --ink:#1A2333; --slate:#64748B; --slate-light:#94A1B5; --border:#E2E6ED;
+  --shadow:0 1px 2px rgba(15,30,61,0.06),0 4px 12px rgba(15,30,61,0.06);
+  --radius:12px; --font-body:'Pretendard',-apple-system,sans-serif; --font-mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%;}
+body{font-family:var(--font-body); background:var(--mist); color:var(--ink); -webkit-font-smoothing:antialiased; min-height:100vh; display:flex; flex-direction:column;}
+::selection{background:var(--amber); color:var(--navy);}
+:focus-visible{outline:2px solid var(--steel); outline-offset:2px;}
+button, input, select, textarea{font-family:inherit;}
+a{color:inherit;}
+
+.app-header{background:linear-gradient(160deg, var(--navy) 0%, var(--navy-2) 100%); color:var(--white); padding:16px 20px; position:sticky; top:0; z-index:50; box-shadow:0 2px 12px rgba(15,30,61,0.25);}
+.app-header-inner{max-width:1180px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:12px;}
+.brand{display:flex; align-items:center; gap:10px;}
+.brand-mark{width:36px; height:36px; border-radius:9px; background:linear-gradient(135deg, var(--ember), var(--amber)); display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-weight:700; font-size:14px; color:var(--navy); flex-shrink:0;}
+.brand-text h1{font-size:15px; font-weight:700; letter-spacing:-0.01em;}
+.brand-text p{font-size:11px; color:#A9B7D1; margin-top:1px;}
+.admin-toggle{display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.14); color:#D8E0EF; padding:8px 14px; border-radius:20px; font-size:12.5px; font-weight:600; cursor:pointer; transition:background .15s ease; white-space:nowrap;}
+.admin-toggle:hover{background:rgba(255,255,255,0.16);}
+.admin-toggle.on{background:var(--amber); color:var(--navy); border-color:var(--amber);}
+
+.tab-nav{background:var(--white); border-bottom:1px solid var(--border); position:sticky; top:64px; z-index:40;}
+.tab-nav-inner{max-width:1180px; margin:0 auto; display:flex; gap:4px; padding:0 20px; overflow-x:auto;}
+.tab-btn{background:none; border:none; cursor:pointer; padding:14px 16px 12px; font-size:13.5px; font-weight:600; color:var(--slate); border-bottom:2.5px solid transparent; white-space:nowrap; display:flex; align-items:center; gap:6px; transition:color .15s ease;}
+.tab-btn:hover{color:var(--steel);}
+.tab-btn.active{color:var(--navy); border-bottom-color:var(--ember);}
+
+main{flex:1; width:100%;}
+.page{max-width:1180px; margin:0 auto; padding:24px 20px 64px; display:none;}
+.page.active{display:block; animation:fadeIn .25s ease;}
+@keyframes fadeIn{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
+
+.section-head{display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:14px; flex-wrap:wrap;}
+.section-head h2{font-size:16px; font-weight:700; letter-spacing:-0.01em;}
+.section-head .sub{font-size:12px; color:var(--slate); margin-top:2px;}
+
+.stat-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:28px;}
+.stat-card{background:var(--white); border:1px solid var(--border); border-radius:var(--radius); padding:16px 18px; box-shadow:var(--shadow); position:relative; overflow:hidden;}
+.stat-card::before{content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--accent, var(--steel));}
+.stat-card.clickable{cursor:pointer; transition:transform .12s ease, box-shadow .12s ease;}
+.stat-card.clickable:hover{transform:translateY(-2px); box-shadow:0 4px 16px rgba(15,30,61,0.12);}
+.stat-card.active-filter{outline:2px solid var(--ember); outline-offset:-1px;}
+.filter-chip{display:inline-flex; align-items:center; gap:6px; background:#FDEDE8; color:var(--ember); font-size:12px; font-weight:600; padding:6px 12px; border-radius:20px; margin-bottom:14px; cursor:pointer;}
+.stat-label{font-size:11.5px; color:var(--slate); font-weight:600; letter-spacing:0.01em;}
+.stat-value{font-family:var(--font-mono); font-size:26px; font-weight:700; color:var(--navy); margin-top:6px; letter-spacing:-0.02em;}
+.stat-value small{font-size:13px; font-weight:600; color:var(--slate); margin-left:2px;}
+
+.dist-card{background:var(--white); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px; margin-bottom:28px; box-shadow:var(--shadow);}
+.dist-bar{display:flex; height:14px; border-radius:7px; overflow:hidden; margin:12px 0 10px; background:var(--mist);}
+.dist-seg{height:100%; transition:width .4s ease;}
+.dist-legend{display:flex; flex-wrap:wrap; gap:14px; font-size:12px; color:var(--slate);}
+.dist-legend span{display:inline-flex; align-items:center; gap:6px;}
+.dist-legend i{width:8px; height:8px; border-radius:2px; display:inline-block;}
+
+.timeline-card{background:var(--navy); border-radius:var(--radius); padding:22px 20px 18px; margin-bottom:28px; color:var(--white); box-shadow:var(--shadow);}
+.timeline-head{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:16px;}
+.timeline-head h3{font-size:14px; font-weight:700;}
+.timeline-head .sub{font-size:11px; color:#93A4C4;}
+.timeline-track{display:flex; flex-direction:column; gap:0; position:relative;}
+.timeline-track::before{content:''; position:absolute; left:29px; top:6px; bottom:6px; width:2px; background:rgba(255,255,255,0.12);}
+.tl-item{display:flex; gap:14px; padding:9px 0; position:relative;}
+.tl-dday{font-family:var(--font-mono); font-size:11px; font-weight:700; width:58px; flex-shrink:0; text-align:center; padding:4px 0; border-radius:6px; z-index:1; height:fit-content; align-self:center;}
+.tl-body{flex:1; min-width:0;}
+.tl-title{font-size:13px; font-weight:600; color:#EEF2FA;}
+.tl-meta{font-size:11px; color:#8FA0C1; margin-top:1px;}
+.tl-empty{font-size:12.5px; color:#8FA0C1; padding:8px 0 4px;}
+
+.toolbar{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:14px;}
+.toolbar input[type="text"], .toolbar select{border:1px solid var(--border); border-radius:8px; padding:8px 12px; font-size:12.5px; background:var(--white); color:var(--ink);}
+.toolbar input[type="text"]{flex:1; min-width:160px;}
+.btn{border:none; border-radius:8px; padding:9px 16px; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; transition:filter .15s ease, transform .1s ease; white-space:nowrap;}
+.btn:active{transform:translateY(1px);}
+.btn-primary{background:var(--navy); color:var(--white);}
+.btn-primary:hover{filter:brightness(1.2);}
+.btn-accent{background:var(--ember); color:var(--white);}
+.btn-accent:hover{filter:brightness(1.1);}
+.btn-ghost{background:var(--white); color:var(--navy); border:1px solid var(--border);}
+.btn-ghost:hover{background:var(--mist);}
+.btn-link{background:var(--steel); color:var(--white);}
+.btn-link:hover{filter:brightness(1.15);}
+.btn-sm{padding:6px 10px; font-size:11.5px;}
+.btn:disabled{opacity:.4; cursor:not-allowed;}
+
+.card-list{display:flex; flex-direction:column; gap:10px;}
+.item-card{background:var(--white); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; box-shadow:var(--shadow); display:flex; align-items:center; gap:14px; flex-wrap:wrap; cursor:pointer; transition:border-color .15s ease;}
+.item-card:hover{border-color:var(--steel-light);}
+.item-main{flex:1; min-width:220px;}
+.item-title-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:4px;}
+.item-title{font-size:15px; font-weight:700; color:var(--navy);}
+.badge{font-size:10.5px; font-weight:700; padding:3px 9px; border-radius:20px; letter-spacing:0.01em;}
+.item-meta{font-size:13.5px; color:var(--slate); display:flex; gap:12px; flex-wrap:wrap; line-height:1.6;}
+.item-meta b{color:var(--ink); font-weight:600;}
+.item-desc{font-size:12px; color:var(--slate); margin-top:4px; display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden;}
+.item-actions{display:flex; gap:6px; margin-left:auto;}
+.empty-state{text-align:center; padding:48px 20px; color:var(--slate); border:1.5px dashed var(--border); border-radius:var(--radius); font-size:13px;}
+
+.st-접수예정{background:#E7EEFB; color:var(--steel);}
+.st-접수중{background:#FDF1DC; color:#9C6B12;}
+.st-마감{background:#EEF1F6; color:var(--slate);}
+.st-선정완료{background:#E3F4EC; color:var(--teal);}
+.st-예정{background:#E7EEFB; color:var(--steel);}
+.st-준비중{background:#FDF1DC; color:#9C6B12;}
+.st-종료{background:#EEF1F6; color:var(--slate);}
+
+.admin-lock{text-align:center; padding:80px 20px; color:var(--slate);}
+.admin-lock .lock-icon{font-size:34px; margin-bottom:10px;}
+.form-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:14px; background:var(--white); border:1px solid var(--border); border-radius:var(--radius); padding:20px; margin-bottom:20px; box-shadow:var(--shadow);}
+.form-field{display:flex; flex-direction:column; gap:5px;}
+.form-field.full{grid-column:1/-1;}
+.form-field label{font-size:11.5px; font-weight:700; color:var(--slate);}
+.form-field input, .form-field select, .form-field textarea{border:1px solid var(--border); border-radius:8px; padding:9px 11px; font-size:13px; color:var(--ink); background:var(--mist);}
+.form-field textarea{resize:vertical; min-height:64px;}
+.form-actions{grid-column:1/-1; display:flex; gap:8px; justify-content:flex-end; margin-top:4px;}
+
+.admin-export-row{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:24px;}
+.export-card{background:var(--white); border:1px solid var(--border); border-radius:var(--radius); padding:16px; flex:1; min-width:220px; box-shadow:var(--shadow);}
+.export-card h4{font-size:13px; font-weight:700; margin-bottom:4px;}
+.export-card p{font-size:11.5px; color:var(--slate); margin-bottom:12px; line-height:1.5;}
+
+.modal-backdrop{position:fixed; inset:0; background:rgba(15,30,61,0.45); display:none; align-items:flex-start; justify-content:center; padding:40px 16px; z-index:100; overflow-y:auto; backdrop-filter:blur(2px);}
+.modal-backdrop.show{display:flex;}
+.modal{background:var(--white); border-radius:14px; width:100%; max-width:560px; padding:22px; box-shadow:0 20px 50px rgba(15,30,61,0.3);}
+.modal-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;}
+.modal-head h3{font-size:15px; font-weight:700;}
+.modal-close{background:none; border:none; font-size:18px; cursor:pointer; color:var(--slate); line-height:1;}
+
+.detail-row{margin-bottom:16px;}
+.detail-row .dlabel{font-size:11.5px; font-weight:700; color:var(--slate); margin-bottom:4px; letter-spacing:0.01em;}
+.detail-row .dval{font-size:14.5px; line-height:1.7; white-space:pre-wrap;}
+.detail-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px;}
+
+.toast{position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--navy); color:var(--white); padding:11px 20px; border-radius:10px; font-size:12.5px; font-weight:600; box-shadow:0 8px 24px rgba(15,30,61,0.3); opacity:0; pointer-events:none; transition:all .25s ease; z-index:200;}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+.app-footer{text-align:center; padding:20px; font-size:11px; color:var(--slate-light);}
+.conn-banner{background:#FBE7E2; color:var(--ember); font-size:12px; font-weight:600; text-align:center; padding:10px 16px; display:none;}
+.conn-banner.show{display:block;}
+
+.cal-controls{display:flex; align-items:center; justify-content:center; gap:16px; margin-bottom:16px;}
+.cal-nav-btn{background:var(--white); border:1px solid var(--border); border-radius:8px; padding:8px 14px; font-weight:700; font-size:13px; cursor:pointer; color:var(--navy);}
+.cal-nav-btn:hover{background:var(--mist);}
+.cal-month-label{font-size:15px; font-weight:700; color:var(--navy); min-width:120px; text-align:center;}
+.cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:20px;}
+.cal-dow{text-align:center; font-size:11px; font-weight:700; color:var(--slate); padding:4px 0 8px;}
+.cal-cell{background:var(--white); border:1px solid var(--border); border-radius:9px; min-height:104px; padding:5px; cursor:pointer; transition:border-color .15s ease, background .15s ease; overflow:hidden;}
+.cal-cell:hover{border-color:var(--steel-light);}
+.cal-cell.today{border-color:var(--ember); border-width:1.5px;}
+.cal-cell.selected{background:#EEF1F6; border-color:var(--steel);}
+.cal-cell.empty{background:transparent; border:none; cursor:default;}
+.cal-daynum{font-size:11.5px; font-weight:700; color:var(--ink); margin-bottom:3px;}
+.cal-cell.sun .cal-daynum{color:var(--ember);}
+.cal-events{display:flex; flex-direction:column; gap:2px;}
+.cal-event-pill{font-size:10px; font-weight:600; color:var(--white); padding:2px 5px; border-radius:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.5;}
+.cal-more{font-size:9.5px; color:var(--slate); font-weight:600; margin-top:1px; padding-left:2px;}
+.cal-day-events-head{font-size:13px; font-weight:700; margin-bottom:10px;}
+
+@media (max-width:640px){
+  .tab-nav{top:60px;}
+  .item-actions{margin-left:0; width:100%;}
+  .stat-value{font-size:22px;}
+  .detail-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="app-header-inner">
+    <div class="brand">
+      <div class="brand-mark">KFI</div>
+      <div class="brand-text">
+        <h1>한국소방산업기술원 해외지원사업</h1>
+        <p>지원사업 공고 · 해외 주요 일정 관리</p>
+      </div>
+    </div>
+    <button class="admin-toggle" id="adminToggleBtn" onclick="toggleAdmin()">🔒 관리자 모드</button>
+  </div>
+</header>
+
+<div class="conn-banner" id="connBanner">⚠️ Firebase 설정이 필요합니다. app.js 상단의 firebaseConfig를 채워주세요.</div>
+
+<nav class="tab-nav">
+  <div class="tab-nav-inner">
+    <button class="tab-btn active" data-page="dashboard" onclick="showPage('dashboard')">🏠 홈</button>
+    <button class="tab-btn" data-page="programs" onclick="showPage('programs')">📝 지원사업</button>
+    <button class="tab-btn" data-page="expos" onclick="showPage('expos')">🌏 해외 주요 일정</button>
+    <button class="tab-btn" data-page="export" onclick="showPage('export')">📈 수출실적분석</button>
+    <button class="tab-btn" data-page="library" onclick="showPage('library')">🗂 자료실</button>
+    <button class="tab-btn" data-page="calendar" onclick="showPage('calendar')">📅 캘린더</button>
+    <button class="tab-btn" data-page="admin" onclick="showPage('admin')">⚙️ 관리자</button>
+  </div>
+</nav>
+
+<main>
+
+  <!-- ================= DASHBOARD ================= -->
+  <section class="page active" id="page-dashboard">
+    <div class="section-head">
+      <div><h2>홈</h2><div class="sub" id="dashDate"></div></div>
+    </div>
+
+    <div class="stat-grid" id="statGrid"></div>
+
+    <div class="dist-card">
+      <div class="section-head" style="margin-bottom:2px;">
+        <h2 style="font-size:13px;">지원사업 접수 현황</h2>
+        <div class="sub" id="distTotal"></div>
+      </div>
+      <div class="dist-bar" id="distBar"></div>
+      <div class="dist-legend" id="distLegend"></div>
+    </div>
+
+    <div class="timeline-card">
+      <div class="timeline-head">
+        <h3>⏱ 다가오는 일정 (D-90 이내)</h3>
+        <span class="sub">접수 마감일 · 해외일정 시작일 통합</span>
+      </div>
+      <div class="timeline-track" id="ddayTimeline"></div>
+    </div>
+
+    <div class="section-head"><h2>최근 업데이트</h2></div>
+    <div class="card-list" id="recentList"></div>
+  </section>
+
+  <!-- ================= PROGRAMS (지원사업) ================= -->
+  <section class="page" id="page-programs">
+    <div class="section-head">
+      <div><h2>지원사업 공고</h2><div class="sub">일정 · 접수기간 · 자격조건 · 지원내용</div></div>
+      <button class="btn btn-accent" id="progAddBtn" onclick="openProgramModal()" style="display:none;">+ 지원사업 등록</button>
+    </div>
+    <div class="stat-grid" id="progStatGrid" style="margin-bottom:16px;"></div>
+    <div id="progFilterChipWrap"></div>
+    <div class="toolbar">
+      <input type="text" id="progSearch" placeholder="사업명, 장소 검색" oninput="renderPrograms()">
+    </div>
+    <div class="card-list" id="progList"></div>
+  </section>
+
+  <!-- ================= EXPOS ================= -->
+  <section class="page" id="page-expos">
+    <div class="section-head">
+      <div><h2>해외 주요 일정</h2><div class="sub">전시회 · 시장개척단 등 해외 주요 일정 관리</div></div>
+      <button class="btn btn-accent" id="expoAddBtn" onclick="openExpoModal()" style="display:none;">+ 일정 등록</button>
+    </div>
+    <div class="stat-grid" id="expoStatGrid" style="margin-bottom:16px;"></div>
+    <div id="expoFilterChipWrap"></div>
+    <div class="toolbar">
+      <input type="text" id="expoSearch" placeholder="일정명, 장소 검색" oninput="renderExpos()">
+    </div>
+    <div class="card-list" id="expoList"></div>
+  </section>
+
+  <!-- ================= EXPORT ANALYSIS (수출실적분석) ================= -->
+  <section class="page" id="page-export">
+    <div class="section-head">
+      <div><h2>수출실적분석</h2><div class="sub" id="exportUpdatedInfo">업로드된 분석 리포트 확인</div></div>
+    </div>
+    <div id="exportAdminBox" style="display:none; margin-bottom:20px;">
+      <div class="form-grid" style="margin-bottom:0;">
+        <div class="form-field full">
+          <label>HTML 리포트 파일 업로드 (.html)</label>
+          <input type="file" id="exportFileInput" accept=".html,.htm">
+        </div>
+        <div class="form-actions" style="justify-content:flex-start;">
+          <button class="btn btn-primary btn-sm" onclick="saveExportReport()">업로드 저장</button>
+          <button class="btn btn-ghost btn-sm" onclick="deleteExportReport()">현재 리포트 삭제</button>
+        </div>
+      </div>
+    </div>
+    <div id="exportViewBox">
+      <div class="empty-state" id="exportEmptyState">아직 업로드된 수출실적 분석 리포트가 없습니다.</div>
+      <iframe id="exportFrame" style="display:none; width:100%; min-height:75vh; border:1px solid var(--border); border-radius:var(--radius); background:var(--white);" sandbox="allow-scripts allow-popups"></iframe>
+    </div>
+  </section>
+
+  <!-- ================= LIBRARY (자료실) ================= -->
+  <section class="page" id="page-library">
+    <div class="section-head">
+      <div><h2>자료실</h2><div class="sub">해외 수출정보 · 지원사업 정보</div></div>
+      <button class="btn btn-accent" id="libAddBtn" onclick="openResourceModal()" style="display:none;">+ 자료 등록</button>
+    </div>
+    <div class="stat-grid" id="libStatGrid" style="margin-bottom:16px;"></div>
+    <div id="libFilterChipWrap"></div>
+    <div class="toolbar">
+      <input type="text" id="libSearch" placeholder="제목, 설명 검색" oninput="renderLibrary()">
+    </div>
+    <div class="card-list" id="libList"></div>
+  </section>
+
+  <!-- ================= CALENDAR (캘린더) ================= -->
+  <section class="page" id="page-calendar">
+    <div class="section-head">
+      <div><h2>캘린더</h2><div class="sub" id="calUpdatedInfo">지원사업 · 해외 주요 일정 통합 캘린더</div></div>
+    </div>
+    <div id="calAdminBox" style="display:none; margin-bottom:20px;">
+      <div class="form-grid" style="margin-bottom:0;">
+        <div class="form-field full">
+          <label>엑셀 파일 업로드 (.xlsx, .xls)</label>
+          <input type="file" id="calFileInput" accept=".xlsx,.xls">
+          <span style="font-size:10.5px; color:var(--slate-light);">컬럼: 시작일(필수) · 종료일(선택, 비우면 하루짜리 일정) · 제목(필수) · 구분 · 장소 · 메모. 첫 행은 헤더로 인식됩니다. 업로드하면 기존 캘린더 데이터 전체가 교체됩니다.</span>
+        </div>
+        <div class="form-actions" style="justify-content:flex-start;">
+          <button class="btn btn-primary btn-sm" onclick="saveCalendarExcel()">업로드 적용</button>
+          <button class="btn btn-ghost btn-sm" onclick="deleteCalendarData()">전체 삭제</button>
+        </div>
+      </div>
+    </div>
+    <div class="cal-controls">
+      <button class="cal-nav-btn" onclick="changeCalendarMonth(-1)">◀ 이전달</button>
+      <div class="cal-month-label" id="calMonthLabel"></div>
+      <button class="cal-nav-btn" onclick="changeCalendarMonth(1)">다음달 ▶</button>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div id="calDayEvents"></div>
+  </section>
+
+  <!-- ================= ADMIN ================= -->
+  <section class="page" id="page-admin">
+    <div id="adminLocked" class="admin-lock">
+      <div class="lock-icon">🔒</div>
+      <div style="font-size:14px; font-weight:600; margin-bottom:6px;">관리자 모드가 아닙니다</div>
+      <div style="font-size:12.5px; margin-bottom:16px;">상단의 "관리자 로그인" 버튼을 눌러 관리자 계정으로 로그인하세요.</div>
+      <button class="btn btn-primary" onclick="toggleAdmin()">🔒 관리자 로그인</button>
+    </div>
+
+    <div id="adminPanel" style="display:none;">
+      <div class="section-head"><h2>데이터 내보내기</h2></div>
+      <div class="admin-export-row">
+        <div class="export-card">
+          <h4>🔴 실시간 연동 상태</h4>
+          <p>이 페이지는 Firestore와 실시간으로 연결되어 있습니다. 관리자가 저장하면 이 링크를 보는 모든 사람에게 즉시 반영됩니다. 별도의 내보내기/재업로드가 필요 없습니다.</p>
+        </div>
+        <div class="export-card">
+          <h4>📊 Excel 내보내기</h4>
+          <p>지원사업·해외일정 데이터를 시트별로 나눈 Excel 파일(.xlsx)로 다운로드합니다.</p>
+          <button class="btn btn-primary btn-sm" onclick="exportExcel()">Excel 내보내기</button>
+        </div>
+        <div class="export-card">
+          <h4>💾 JSON 백업 / 일괄 가져오기</h4>
+          <p>백업용 다운로드, 또는 예전 localStorage 백업 파일을 Firestore로 일괄 업로드할 때 사용하세요 (기존 데이터에 추가됩니다).</p>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-ghost btn-sm" onclick="exportJSON()">내보내기</button>
+            <button class="btn btn-ghost btn-sm" onclick="document.getElementById('importFile').click()">가져오기</button>
+            <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
+          </div>
+        </div>
+      </div>
+
+      <div class="section-head"><h2>지원사업 데이터 관리</h2></div>
+      <div class="card-list" id="adminProgList" style="margin-bottom:28px;"></div>
+
+      <div class="section-head"><h2>해외 주요 일정 데이터 관리</h2></div>
+      <div class="card-list" id="adminExpoList"></div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="app-footer">한국소방산업기술원 해외지원사업 · 데이터는 이 브라우저에만 저장됩니다 (localStorage)</footer>
+
+<!-- ===== Program Edit Modal ===== -->
+<div class="modal-backdrop" id="progModalBackdrop">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="progModalTitle">지원사업 등록</h3>
+      <button class="modal-close" onclick="closeProgramModal()">✕</button>
+    </div>
+    <form onsubmit="saveProgram(event)">
+      <input type="hidden" id="progId">
+      <div class="form-grid" style="padding:0; border:none; box-shadow:none; margin-bottom:0;">
+        <div class="form-field full"><label>사업명 *</label><input type="text" id="progName" required></div>
+        <div class="form-field"><label>상태</label>
+          <select id="progStatus"><option>접수예정</option><option>접수중</option><option>마감</option><option>선정완료</option></select>
+          <span style="font-size:10.5px; color:var(--slate-light);">접수예정·접수중·마감은 접수기간에 따라 자동 계산됩니다. "선정완료"만 직접 선택 시 고정됩니다.</span>
+        </div>
+        <div class="form-field"><label>진행 장소</label><input type="text" id="progLocation" placeholder="예: 서울 코엑스 / 온라인"></div>
+        <div class="form-field"><label>진행 일정 시작</label><input type="date" id="progEventStart"></div>
+        <div class="form-field"><label>진행 일정 종료</label><input type="date" id="progEventEnd"></div>
+        <div class="form-field"><label>접수 시작일</label><input type="date" id="progApplyStart"></div>
+        <div class="form-field"><label>접수 마감일</label><input type="date" id="progApplyEnd"></div>
+        <div class="form-field full"><label>공고문 홈페이지 주소 (URL)</label><input type="text" id="progUrl" placeholder="https://..."></div>
+        <div class="form-field"><label>문의 연락처</label><input type="text" id="progContactPhone" placeholder="예: 02-1234-5678"></div>
+        <div class="form-field"><label>문의 이메일</label><input type="email" id="progContactEmail" placeholder="예: intlkfi@gmail.com"></div>
+        <div class="form-field full"><label>자격조건</label><textarea id="progQualification" placeholder="예: 소방산업 관련 중소기업, 사업자등록 1년 이상 등"></textarea></div>
+        <div class="form-field full"><label>지원내용</label><textarea id="progContent" placeholder="예: 인증 컨설팅 비용의 70% 지원 (최대 500만원) 등"></textarea></div>
+        <div class="form-field full"><label>메모</label><textarea id="progMemo"></textarea></div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" onclick="closeProgramModal()">취소</button>
+          <button type="submit" class="btn btn-primary">저장</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===== Program Detail (read-only) Modal ===== -->
+<div class="modal-backdrop" id="progDetailBackdrop">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="progDetailTitle">지원사업 상세</h3>
+      <button class="modal-close" onclick="closeProgramDetail()">✕</button>
+    </div>
+    <div id="progDetailBody"></div>
+  </div>
+</div>
+
+<!-- ===== Expo Modal ===== -->
+<div class="modal-backdrop" id="expoModalBackdrop">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="expoModalTitle">일정 등록</h3>
+      <button class="modal-close" onclick="closeExpoModal()">✕</button>
+    </div>
+    <form onsubmit="saveExpo(event)">
+      <input type="hidden" id="expoId">
+      <div class="form-grid" style="padding:0; border:none; box-shadow:none; margin-bottom:0;">
+        <div class="form-field full"><label>일정명 *</label><input type="text" id="expoName" required placeholder="예: INTERSCHUTZ 2026, 베트남 시장개척단"></div>
+        <div class="form-field"><label>구분</label>
+          <select id="expoCategory"><option>전시회</option><option>시장개척단</option><option>설명회</option><option>간담회</option><option>기타</option></select>
+        </div>
+        <div class="form-field"><label>장소</label><input type="text" id="expoLocation" placeholder="예: 독일 하노버"></div>
+        <div class="form-field"><label>상태</label>
+          <select id="expoStatus"><option>예정</option><option>준비중</option><option>진행중</option><option>종료</option></select>
+        </div>
+        <div class="form-field"><label>시작일</label><input type="date" id="expoStart"></div>
+        <div class="form-field"><label>종료일</label><input type="date" id="expoEnd"></div>
+        <div class="form-field"><label>참가기업 수</label><input type="number" id="expoParticipants" min="0"></div>
+        <div class="form-field full"><label>메모</label><textarea id="expoMemo"></textarea></div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" onclick="closeExpoModal()">취소</button>
+          <button type="submit" class="btn btn-primary">저장</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===== Library Resource Modal ===== -->
+<div class="modal-backdrop" id="libModalBackdrop">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="libModalTitle">자료 등록</h3>
+      <button class="modal-close" onclick="closeResourceModal()">✕</button>
+    </div>
+    <form onsubmit="saveResource(event)">
+      <input type="hidden" id="libId">
+      <div class="form-grid" style="padding:0; border:none; box-shadow:none; margin-bottom:0;">
+        <div class="form-field full"><label>제목 *</label><input type="text" id="libTitle" required></div>
+        <div class="form-field full"><label>구분</label>
+          <select id="libCategory"><option>해외 수출정보</option><option>지원사업 정보</option></select>
+        </div>
+        <div class="form-field full"><label>자료 링크 (URL)</label><input type="text" id="libUrl" placeholder="구글 드라이브 공유 링크를 그대로 붙여넣으세요"></div>
+        <div class="form-field full"><span style="font-size:10.5px; color:var(--slate-light);">구글 드라이브 링크는 자동으로 다운로드 링크로 변환됩니다. 파일 공유 설정은 "링크가 있는 모든 사용자" + "뷰어"로 해주세요.</span></div>
+        <div class="form-field full"><label>설명</label><textarea id="libDescription"></textarea></div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" onclick="closeResourceModal()">취소</button>
+          <button type="submit" class="btn btn-primary">저장</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===== Admin Login Modal ===== -->
+<div class="modal-backdrop" id="loginModalBackdrop">
+  <div class="modal" style="max-width:380px;">
+    <div class="modal-head">
+      <h3>관리자 로그인</h3>
+      <button class="modal-close" onclick="closeLoginModal()">✕</button>
+    </div>
+    <form onsubmit="doLogin(event)">
+      <div class="form-grid" style="padding:0; border:none; box-shadow:none; margin-bottom:0; grid-template-columns:1fr;">
+        <div class="form-field"><label>이메일</label><input type="email" id="loginEmail" required autocomplete="username"></div>
+        <div class="form-field"><label>비밀번호</label><input type="password" id="loginPassword" required autocomplete="current-password"></div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-ghost" onclick="closeLoginModal()">취소</button>
+          <button type="submit" class="btn btn-primary">로그인</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
