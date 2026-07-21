@@ -18,6 +18,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging-compat.js"></script>
 <style>
 :root{
   --navy:#0F1E3D; --navy-2:#152a4f; --steel:#2C4A7C; --steel-light:#5978aa;
@@ -100,6 +101,9 @@ main{flex:1; width:100%;}
 .btn-accent{background:var(--ember); color:var(--white);}
 .btn-accent:hover{filter:brightness(1.1);}
 .btn-ghost{background:var(--white); color:var(--navy); border:1px solid var(--border);}
+.btn-ghost.active{background:var(--navy); color:var(--white); border-color:var(--navy);}
+.star-btn{background:none; border:none; font-size:16px; padding:2px 8px; cursor:pointer; line-height:1;}
+.star-btn.on{color:var(--amber);}
 .btn-ghost:hover{background:var(--mist);}
 .btn-link{background:var(--steel); color:var(--white);}
 .btn-link:hover{filter:brightness(1.15);}
@@ -144,7 +148,8 @@ main{flex:1; width:100%;}
 
 .modal-backdrop{position:fixed; inset:0; background:rgba(15,30,61,0.45); display:none; align-items:flex-start; justify-content:center; padding:40px 16px; z-index:100; overflow-y:auto; backdrop-filter:blur(2px);}
 .modal-backdrop.show{display:flex;}
-.modal{background:var(--white); border-radius:14px; width:100%; max-width:560px; padding:22px; box-shadow:0 20px 50px rgba(15,30,61,0.3);}
+.modal{background:var(--white); border-radius:14px; width:100%; max-width:560px; padding:22px; box-shadow:0 20px 50px rgba(15,30,61,0.3); max-height:85vh; overflow-y:auto;}
+.modal.modal-lg{max-width:760px; padding:28px;}
 .modal-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;}
 .modal-head h3{font-size:15px; font-weight:700;}
 .modal-close{background:none; border:none; font-size:18px; cursor:pointer; color:var(--slate); line-height:1;}
@@ -256,6 +261,8 @@ main{flex:1; width:100%;}
     <div id="progFilterChipWrap"></div>
     <div class="toolbar">
       <input type="text" id="progSearch" placeholder="사업명, 장소 검색" oninput="renderPrograms()">
+      <button class="btn btn-ghost btn-sm" id="favOnlyBtn" onclick="toggleFavoriteOnlyFilter()">☆ 즐겨찾기만</button>
+      <button class="btn btn-ghost btn-sm" id="notifyToggleBtn" onclick="toggleNotificationSubscription()">🔔 마감임박 알림 받기</button>
     </div>
     <div class="card-list" id="progList"></div>
   </section>
@@ -396,12 +403,23 @@ main{flex:1; width:100%;}
 
 <!-- ===== Program Detail (read-only) Modal ===== -->
 <div class="modal-backdrop" id="progDetailBackdrop">
-  <div class="modal">
+  <div class="modal modal-lg">
     <div class="modal-head">
       <h3 id="progDetailTitle">지원사업 상세</h3>
       <button class="modal-close" onclick="closeProgramDetail()">✕</button>
     </div>
     <div id="progDetailBody"></div>
+  </div>
+</div>
+
+<!-- ===== Expo Detail (read-only) Modal ===== -->
+<div class="modal-backdrop" id="expoDetailBackdrop">
+  <div class="modal modal-lg">
+    <div class="modal-head">
+      <h3 id="expoDetailTitle">일정 상세</h3>
+      <button class="modal-close" onclick="closeExpoDetail()">✕</button>
+    </div>
+    <div id="expoDetailBody"></div>
   </div>
 </div>
 
