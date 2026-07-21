@@ -209,7 +209,6 @@ main{flex:1; width:100%;}
     <button class="tab-btn active" data-page="dashboard" onclick="showPage('dashboard')">🏠 홈</button>
     <button class="tab-btn" data-page="programs" onclick="showPage('programs')">📝 지원사업</button>
     <button class="tab-btn" data-page="expos" onclick="showPage('expos')">🌏 해외 주요 일정</button>
-    <button class="tab-btn" data-page="export" onclick="showPage('export')">📈 수출실적분석</button>
     <button class="tab-btn" data-page="library" onclick="showPage('library')">🗂 자료실</button>
     <button class="tab-btn" data-page="calendar" onclick="showPage('calendar')">📅 캘린더</button>
     <button class="tab-btn" data-page="admin" onclick="showPage('admin')">⚙️ 관리자</button>
@@ -273,29 +272,6 @@ main{flex:1; width:100%;}
       <input type="text" id="expoSearch" placeholder="일정명, 장소 검색" oninput="renderExpos()">
     </div>
     <div class="card-list" id="expoList"></div>
-  </section>
-
-  <!-- ================= EXPORT ANALYSIS (수출실적분석) ================= -->
-  <section class="page" id="page-export">
-    <div class="section-head">
-      <div><h2>수출실적분석</h2><div class="sub" id="exportUpdatedInfo">업로드된 분석 리포트 확인</div></div>
-    </div>
-    <div id="exportAdminBox" style="display:none; margin-bottom:20px;">
-      <div class="form-grid" style="margin-bottom:0;">
-        <div class="form-field full">
-          <label>HTML 리포트 파일 업로드 (.html)</label>
-          <input type="file" id="exportFileInput" accept=".html,.htm">
-        </div>
-        <div class="form-actions" style="justify-content:flex-start;">
-          <button class="btn btn-primary btn-sm" onclick="saveExportReport()">업로드 저장</button>
-          <button class="btn btn-ghost btn-sm" onclick="deleteExportReport()">현재 리포트 삭제</button>
-        </div>
-      </div>
-    </div>
-    <div id="exportViewBox">
-      <div class="empty-state" id="exportEmptyState">아직 업로드된 수출실적 분석 리포트가 없습니다.</div>
-      <iframe id="exportFrame" style="display:none; width:100%; min-height:75vh; border:1px solid var(--border); border-radius:var(--radius); background:var(--white);" sandbox="allow-scripts allow-popups"></iframe>
-    </div>
   </section>
 
   <!-- ================= LIBRARY (자료실) ================= -->

@@ -19,7 +19,7 @@ const STATUS_COLOR = {
   "예정": "#2C4A7C", "준비중": "#E8A33D", "진행중": "#2C4A7C", "종료": "#94A1B5"
 };
 
-let state = { programs: [], expos: [], resources: [], report: null, calendarEvents: [], calendarMeta: null };
+let state = { programs: [], expos: [], resources: [], calendarEvents: [], calendarMeta: null };
 let currentUser = null;
 let db = null;
 let firebaseReady = false;
@@ -54,11 +54,6 @@ function initFirebase(){
     rerenderCurrentPage();
   }, err=>{ console.error(err); toast("자료실 데이터를 불러오지 못했습니다"); });
 
-  db.collection("reports").doc("exportAnalysis").onSnapshot(doc=>{
-    state.report = doc.exists ? doc.data() : null;
-    rerenderCurrentPage();
-  }, err=>{ console.error(err); toast("수출실적분석 데이터를 불러오지 못했습니다"); });
-
   db.collection("calendarData").doc("main").onSnapshot(doc=>{
     state.calendarEvents = doc.exists ? (doc.data().events||[]) : [];
     state.calendarMeta = doc.exists ? {fileName:doc.data().fileName, updatedAt:doc.data().updatedAt} : null;
@@ -76,7 +71,6 @@ function rerenderCurrentPage(){
   renderDashboard();
   if(current==="programs") renderPrograms();
   if(current==="expos") renderExpos();
-  if(current==="export") renderExportPage();
   if(current==="library") renderLibrary();
   if(current==="calendar") renderCalendarPage();
   if(current==="admin") renderAdmin();
@@ -91,7 +85,6 @@ function showPage(name){
   if(name==="dashboard") renderDashboard();
   if(name==="programs") renderPrograms();
   if(name==="expos") renderExpos();
-  if(name==="export") renderExportPage();
   if(name==="library") renderLibrary();
   if(name==="calendar") renderCalendarPage();
   if(name==="admin") renderAdmin();
@@ -138,7 +131,6 @@ function applyAdminUI(){
   document.getElementById("progAddBtn").style.display = on ? "inline-flex" : "none";
   document.getElementById("expoAddBtn").style.display = on ? "inline-flex" : "none";
   document.getElementById("libAddBtn").style.display = on ? "inline-flex" : "none";
-  document.getElementById("exportAdminBox").style.display = on ? "block" : "none";
   document.getElementById("calAdminBox").style.display = on ? "block" : "none";
   rerenderCurrentPage();
 }
@@ -602,53 +594,6 @@ function deleteResource(id){
   if(!isAdmin()){ toast("관리자 로그인이 필요합니다"); return; }
   if(!confirm("이 자료를 삭제할까요?")) return;
   db.collection("resources").doc(id).delete()
-    .then(()=>toast("삭제되었습니다"))
-    .catch(err=>toast("삭제 실패: "+err.message));
-}
-
-/* ===================== EXPORT ANALYSIS (수출실적분석) ===================== */
-function renderExportPage(){
-  const info = document.getElementById("exportUpdatedInfo");
-  const empty = document.getElementById("exportEmptyState");
-  const frame = document.getElementById("exportFrame");
-  if(state.report && state.report.html){
-    const dt = state.report.updatedAt?.toDate ? state.report.updatedAt.toDate() : null;
-    const dtStr = dt ? dt.toLocaleDateString("ko-KR",{year:"numeric",month:"long",day:"numeric"}) : "";
-    info.textContent = `${state.report.fileName||"업로드된 리포트"} · 마지막 업데이트 ${dtStr}`;
-    empty.style.display = "none";
-    frame.style.display = "block";
-    frame.srcdoc = state.report.html;
-  } else {
-    info.textContent = "업로드된 분석 리포트 확인";
-    empty.style.display = "block";
-    frame.style.display = "none";
-    frame.srcdoc = "";
-  }
-}
-function saveExportReport(){
-  if(!isAdmin()){ toast("관리자 로그인이 필요합니다"); return; }
-  const input = document.getElementById("exportFileInput");
-  const file = input.files[0];
-  if(!file){ toast("업로드할 HTML 파일을 선택해주세요"); return; }
-  const reader = new FileReader();
-  reader.onload = e=>{
-    const html = e.target.result;
-    const byteSize = new Blob([html]).size;
-    if(byteSize > 900000){
-      alert("파일 용량이 너무 큽니다 (약 900KB 이하 권장). 이미지가 포함되어 있다면 압축하거나 제거 후 다시 시도해주세요.");
-      return;
-    }
-    db.collection("reports").doc("exportAnalysis").set({
-      html, fileName: file.name, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    }).then(()=>{ toast("리포트가 업로드되었습니다"); input.value=""; })
-      .catch(err=>toast("업로드 실패: "+err.message));
-  };
-  reader.readAsText(file);
-}
-function deleteExportReport(){
-  if(!isAdmin()){ toast("관리자 로그인이 필요합니다"); return; }
-  if(!confirm("현재 업로드된 리포트를 삭제할까요?")) return;
-  db.collection("reports").doc("exportAnalysis").delete()
     .then(()=>toast("삭제되었습니다"))
     .catch(err=>toast("삭제 실패: "+err.message));
 }
