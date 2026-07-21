@@ -14,6 +14,12 @@ const firebaseConfig = {
   measurementId: "G-YV403GXTKB"
 };
 
+/* -----------------------------------------------------------------------
+   ⚠️ 설정 필요(마감임박 알림 기능): Firebase 콘솔 > 프로젝트 설정 > Cloud Messaging 탭 >
+   "웹 push 인증서"에서 키 쌍을 생성한 뒤 그 값을 아래에 붙여넣으세요.
+------------------------------------------------------------------------ */
+const VAPID_KEY = "BBZm96-P1rPmdvLtrifBPBR2tS45oMUG8brnSgBFLrZaz6vW9VIQTH5uSP4_rC2xV0f6wtTCfYdVdOllIgxw3_4";
+
 const STATUS_COLOR = {
   "접수예정": "#2C4A7C", "접수중": "#E8A33D", "마감": "#94A1B5", "선정완료": "#1B8A6B",
   "예정": "#2C4A7C", "준비중": "#E8A33D", "진행중": "#2C4A7C", "종료": "#94A1B5"
@@ -25,8 +31,10 @@ let db = null;
 let firebaseReady = false;
 let programStatFilter = null; // null | '접수예정' | '접수중' | 'closingSoon'
 let expoStatFilter = null; // null | 'upcoming'
+let favoriteOnlyFilter = false;
 let calendarViewDate = new Date();
 let selectedCalDate = null;
+let swRegistration = null;
 
 /* ---------- Firebase init ---------- */
 function initFirebase(){
@@ -59,6 +67,16 @@ function initFirebase(){
     state.calendarMeta = doc.exists ? {fileName:doc.data().fileName, updatedAt:doc.data().updatedAt} : null;
     rerenderCurrentPage();
   }, err=>{ console.error(err); toast("캘린더 데이터를 불러오지 못했습니다"); });
+
+  if(VAPID_KEY !== "YOUR_VAPID_KEY" && "Notification" in window && firebase.messaging.isSupported()){
+    try{
+      firebase.messaging().onMessage(payload=>{
+        const title = payload.notification?.title || "마감임박 알림";
+        const body = payload.notification?.body || "";
+        toast(`🔔 ${title} - ${body}`);
+      });
+    }catch(e){ console.error(e); }
+  }
 
   firebase.auth().onAuthStateChanged(user=>{
     currentUser = user;
@@ -228,11 +246,11 @@ function renderDashboard(){
     </div>`).join("") : `<div class="tl-empty">90일 이내 예정된 일정이 없습니다.</div>`;
 
   const all = [
-    ...programs.map(p=>({...p, status:getEffectiveStatus(p), __type:"지원사업", __label:p.name, __sub:`${p.location||"-"} · ${getEffectiveStatus(p)}`})),
-    ...expos.map(e=>({...e, __type:e.category||"해외일정", __label:e.name, __sub:`${e.location||"-"} · ${e.status}`}))
+    ...programs.map(p=>({...p, status:getEffectiveStatus(p), __kind:"program", __type:"지원사업", __label:p.name, __sub:`${p.location||"-"} · ${getEffectiveStatus(p)}`})),
+    ...expos.map(e=>({...e, __kind:"expo", __type:e.category||"해외일정", __label:e.name, __sub:`${e.location||"-"} · ${e.status}`}))
   ].slice(0,5); // 이미 updatedAt desc 정렬된 상태에서 병합
   document.getElementById("recentList").innerHTML = all.length ? all.map(it=>`
-    <div class="item-card" style="cursor:default;">
+    <div class="item-card" onclick="${it.__kind==='program'?`openProgramDetail('${it.id}')`:`openExpoDetail('${it.id}')`}">
       <div class="item-main">
         <div class="item-title-row"><span class="item-title">${esc(it.__label)}</span>${badge(it.status)}</div>
         <div class="item-meta"><span>${it.__type}</span><span>${esc(it.__sub)}</span></div>
@@ -241,9 +259,85 @@ function renderDashboard(){
 }
 
 /* ===================== PROGRAMS (지원사업) ===================== */
+/* ===================== FAVORITES (즐겨찾기, 로그인 불필요) ===================== */
+const LS_KEY_FAVORITES = "kfi_favorite_programs";
+function getFavorites(){
+  try{ return JSON.parse(localStorage.getItem(LS_KEY_FAVORITES) || "[]"); }catch(e){ return []; }
+}
+function isFavorite(id){ return getFavorites().includes(id); }
+function toggleFavorite(id){
+  let favs = getFavorites();
+  favs = favs.includes(id) ? favs.filter(x=>x!==id) : [...favs, id];
+  localStorage.setItem(LS_KEY_FAVORITES, JSON.stringify(favs));
+  syncPushSubscriptionFavorites();
+  rerenderCurrentPage();
+  if(document.getElementById("progDetailBackdrop").classList.contains("show")) openProgramDetail(id);
+}
+function favoriteStarBtn(id){
+  const on = isFavorite(id);
+  return `<button class="btn btn-sm star-btn ${on?'on':''}" onclick="event.stopPropagation(); toggleFavorite('${id}')" title="${on?'즐겨찾기 해제':'즐겨찾기 추가'}">${on?'⭐':'☆'}</button>`;
+}
+
+/* ===================== 마감임박 푸시 알림 구독 ===================== */
+const LS_KEY_PUSH_TOKEN = "kfi_push_token";
+function isNotificationSubscribed(){
+  return !!localStorage.getItem(LS_KEY_PUSH_TOKEN);
+}
+async function toggleNotificationSubscription(){
+  if(!firebaseReady){ toast("Firebase 설정이 필요합니다"); return; }
+  if(VAPID_KEY === "YOUR_VAPID_KEY"){ toast("관리자가 아직 알림 기능을 설정하지 않았습니다"); return; }
+  if(!("Notification" in window)){ toast("이 브라우저는 알림을 지원하지 않습니다"); return; }
+
+  if(isNotificationSubscribed()){
+    const token = localStorage.getItem(LS_KEY_PUSH_TOKEN);
+    try{ await db.collection("pushSubscriptions").doc(token).delete(); }catch(e){}
+    localStorage.removeItem(LS_KEY_PUSH_TOKEN);
+    toast("마감임박 알림을 껐습니다");
+    updateNotifyButtonUI();
+    return;
+  }
+
+  try{
+    const permission = await Notification.requestPermission();
+    if(permission !== "granted"){ toast("알림 권한이 허용되지 않았습니다"); return; }
+    const messaging = firebase.messaging();
+    const token = await messaging.getToken({
+      vapidKey: VAPID_KEY,
+      serviceWorkerRegistration: swRegistration || undefined
+    });
+    if(!token){ toast("알림 등록에 실패했습니다"); return; }
+    await db.collection("pushSubscriptions").doc(token).set({
+      favoritePrograms: getFavorites(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, {merge:true});
+    localStorage.setItem(LS_KEY_PUSH_TOKEN, token);
+    toast("즐겨찾기 사업의 마감임박 알림을 받습니다");
+    updateNotifyButtonUI();
+  }catch(err){
+    console.error(err);
+    toast("알림 등록 중 오류가 발생했습니다");
+  }
+}
+function syncPushSubscriptionFavorites(){
+  if(!firebaseReady || !isNotificationSubscribed()) return;
+  const token = localStorage.getItem(LS_KEY_PUSH_TOKEN);
+  db.collection("pushSubscriptions").doc(token).set({
+    favoritePrograms: getFavorites(),
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  }, {merge:true}).catch(()=>{});
+}
+function updateNotifyButtonUI(){
+  const btn = document.getElementById("notifyToggleBtn");
+  if(!btn) return;
+  const on = isNotificationSubscribed();
+  btn.textContent = on ? "🔔 알림 받는 중 (끄기)" : "🔔 마감임박 알림 받기";
+  btn.classList.toggle("active", on);
+}
+
 function getFilteredPrograms(){
   const q = document.getElementById("progSearch").value.trim().toLowerCase();
   return state.programs.filter(p=>{
+    if(favoriteOnlyFilter && !isFavorite(p.id)) return false;
     if(programStatFilter){
       if(programStatFilter==="closingSoon"){
         const d = daysUntil(p.applyEnd);
@@ -260,6 +354,10 @@ function toggleProgramFilter(type){
 }
 function clearProgramFilter(){
   programStatFilter = null;
+  renderPrograms();
+}
+function toggleFavoriteOnlyFilter(){
+  favoriteOnlyFilter = !favoriteOnlyFilter;
   renderPrograms();
 }
 function renderProgramTopStats(){
@@ -289,6 +387,10 @@ function renderProgramFilterChip(){
 function renderPrograms(){
   renderProgramTopStats();
   renderProgramFilterChip();
+  const favBtn = document.getElementById("favOnlyBtn");
+  favBtn.textContent = favoriteOnlyFilter ? "⭐ 즐겨찾기만" : "☆ 즐겨찾기만";
+  favBtn.classList.toggle("active", favoriteOnlyFilter);
+  updateNotifyButtonUI();
   const list = getFilteredPrograms();
   const admin = isAdmin();
   document.getElementById("progList").innerHTML = list.length ? list.map(p=>{
@@ -298,7 +400,7 @@ function renderPrograms(){
     return `
     <div class="item-card" onclick="openProgramDetail('${p.id}')">
       <div class="item-main">
-        <div class="item-title-row"><span class="item-title">${esc(p.name)}</span>${badge(eff)}${ddayTag}</div>
+        <div class="item-title-row">${favoriteStarBtn(p.id)}<span class="item-title">${esc(p.name)}</span>${badge(eff)}${ddayTag}</div>
         <div class="item-meta">
           <span>진행장소 <b>${esc(p.location)||"-"}</b></span>
           <span>진행일정 <b>${fmtDate(p.eventStart)} ~ ${fmtDate(p.eventEnd)}</b></span>
@@ -321,7 +423,7 @@ function openProgramDetail(id){
   const eff = getEffectiveStatus(p);
   const d = daysUntil(p.applyEnd);
   document.getElementById("progDetailBody").innerHTML = `
-    <div class="item-title-row" style="margin-bottom:16px;">${badge(eff)}${(eff==="접수중"||eff==="접수예정") && d!==null ? `<span class="badge" style="background:#EEF1F6;color:${ddayColor(d)}">접수마감 ${ddayLabel(d)}</span>` : ""}</div>
+    <div class="item-title-row" style="margin-bottom:16px;">${favoriteStarBtn(p.id)}${badge(eff)}${(eff==="접수중"||eff==="접수예정") && d!==null ? `<span class="badge" style="background:#EEF1F6;color:${ddayColor(d)}">접수마감 ${ddayLabel(d)}</span>` : ""}</div>
     <div class="detail-grid">
       <div class="detail-row"><div class="dlabel">진행 일정</div><div class="dval">${fmtDate(p.eventStart)} ~ ${fmtDate(p.eventEnd)}</div></div>
       <div class="detail-row"><div class="dlabel">진행 장소</div><div class="dval">${esc(p.location)||"-"}</div></div>
@@ -442,7 +544,7 @@ function renderExpos(){
   const list = getFilteredExpos();
   const admin = isAdmin();
   document.getElementById("expoList").innerHTML = list.length ? list.map(e=>`
-    <div class="item-card" style="cursor:default;">
+    <div class="item-card" onclick="openExpoDetail('${e.id}')">
       <div class="item-main">
         <div class="item-title-row"><span class="item-title">${esc(e.name)}</span>${badge(e.status)}<span class="badge" style="background:#EEF1F6;color:var(--slate)">${esc(e.category)||"전시회"}</span></div>
         <div class="item-meta">
@@ -452,12 +554,29 @@ function renderExpos(){
           ${e.memo?`<span>${esc(e.memo)}</span>`:""}
         </div>
       </div>
-      ${admin?`<div class="item-actions">
+      ${admin?`<div class="item-actions" onclick="event.stopPropagation()">
         <button class="btn btn-ghost btn-sm" onclick="openExpoModal('${e.id}')">수정</button>
         <button class="btn btn-ghost btn-sm" onclick="deleteExpo('${e.id}')">삭제</button>
       </div>`:""}
     </div>`).join("") : `<div class="empty-state">조건에 맞는 일정이 없습니다.</div>`;
 }
+function openExpoDetail(id){
+  const e = state.expos.find(x=>x.id===id);
+  if(!e) return;
+  document.getElementById("expoDetailTitle").textContent = e.name;
+  document.getElementById("expoDetailBody").innerHTML = `
+    <div class="item-title-row" style="margin-bottom:16px;">${badge(e.status)}<span class="badge" style="background:#EEF1F6;color:var(--slate)">${esc(e.category)||"전시회"}</span></div>
+    <div class="detail-grid">
+      <div class="detail-row"><div class="dlabel">기간</div><div class="dval">${fmtDate(e.start)} ~ ${fmtDate(e.end)}</div></div>
+      <div class="detail-row"><div class="dlabel">장소</div><div class="dval">${esc(e.location)||"-"}</div></div>
+      <div class="detail-row"><div class="dlabel">참가기업 수</div><div class="dval">${e.participants||0}개사</div></div>
+    </div>
+    ${e.memo?`<div class="detail-row"><div class="dlabel">메모</div><div class="dval">${esc(e.memo)}</div></div>`:""}
+    ${isAdmin()?`<div class="form-actions" style="padding:0;"><button class="btn btn-ghost" onclick="closeExpoDetail(); openExpoModal('${e.id}')">수정하기</button></div>`:""}
+  `;
+  document.getElementById("expoDetailBackdrop").classList.add("show");
+}
+function closeExpoDetail(){ document.getElementById("expoDetailBackdrop").classList.remove("show"); }
 function openExpoModal(id){
   if(!isAdmin()){ toast("관리자 로그인이 필요합니다"); return; }
   document.getElementById("expoModalTitle").textContent = id ? "일정 정보 수정" : "일정 등록";
@@ -845,6 +964,8 @@ window.addEventListener("DOMContentLoaded", ()=>{
   renderDashboard();
   applyAdminUI();
   if("serviceWorker" in navigator){
-    navigator.serviceWorker.register("sw.js").catch(err=>console.error("SW 등록 실패", err));
+    navigator.serviceWorker.register("sw.js")
+      .then(reg=>{ swRegistration = reg; })
+      .catch(err=>console.error("SW 등록 실패", err));
   }
 });
